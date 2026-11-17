@@ -1,0 +1,40 @@
+{
+  "name": "constructpulse-field-portal",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "engines": {
+    "node": ">=24.12.0"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test:e2e": "playwright test",
+    "test:e2e:multi-user": "playwright test --project=multi-user",
+    "test:e2e:ui": "playwright test --ui",
+    "test:security": "firebase emulators:exec --only firestore --project demo-constructpulse-security \"node --test tests/firestore.rules.test.js\""
+  },
+  "dependencies": {
+    "firebase": "13.3.0",
+    "lucide-react": "1.62.0",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "react-router-dom": "7.18.4",
+    "vite": "8.3.5",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
+  },
+  "overrides": {
+    "@grpc/grpc-js": "1.14.7"
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "6.0.0",
+    "@playwright/test": "^1.65.0",
+    "@tailwindcss/vite": "4.3.3",
+    "@vitejs/plugin-react": "6.1.2",
+    "autoprefixer": "10.6.2",
+    "dotenv": "^18.0.10",
+    "postcss": "8.5.32",
+    "tailwindcss": "4.3.3"
+  }
+}

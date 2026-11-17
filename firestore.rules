@@ -1,0 +1,128 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function userData() { return get(/databases/$(database)/documents/users/$(request.auth.uid)).data; }
+    function admin() { return signedIn() && userData().role == 'admin' && userData().status == 'active'; }
+    function leader() { return signedIn() && userData().role in ['teamLeader', 'teamleader'] && userData().status == 'active'; }
+    function leaderOwns(employeeId) { return leader() && userData().employeeId == employeeId; }
+    function validAttendanceSubmission(data) {
+      return data.keys().hasAll(['employeeId', 'employeeName', 'site', 'date', 'status', 'reviewStatus', 'payrollStatus', 'payrollVerifiedAt', 'payrollVerifiedBy', 'editAllowed', 'overtimeCount', 'totalPayment', 'siteTotals', 'workers', 'note', 'rosterSummary', 'createdAt', 'submittedAt', 'updatedAt'])
+        && data.keys().hasOnly(['employeeId', 'employeeName', 'site', 'date', 'status', 'reviewStatus', 'payrollStatus', 'payrollVerifiedAt', 'payrollVerifiedBy', 'editAllowed', 'overtimeCount', 'totalPayment', 'siteTotals', 'workers', 'note', 'rosterSummary', 'createdAt', 'submittedAt', 'updatedAt'])
+        && data.employeeId is string
+        && data.employeeName is string
+        && data.date is string
+        && data.date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && data.status == 'Submitted'
+        && data.reviewStatus == 'Pending'
+        && data.payrollStatus == 'Unverified'
+        && data.payrollVerifiedAt == null
+        && data.payrollVerifiedBy == null
+        && data.editAllowed == false
+        && data.overtimeCount is number
+        && data.totalPayment is number
+        && data.totalPayment >= 0
+        && data.siteTotals is list
+        && data.siteTotals.size() <= 100
+        && data.workers is list
+        && data.workers.size() <= 100
+        && data.note is string
+        && data.note.size() <= 1000
+        && data.rosterSummary is string;
+    }
+
+    match /users/{uid} {
+      allow read: if signedIn() && (request.auth.uid == uid || admin());
+      allow create: if admin() && request.resource.data.role in ['teamleader', 'teamLeader'];
+      allow update: if admin() || (request.auth.uid == uid && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastLoginAt', 'sessionToken']));
+      allow delete: if false;
+    }
+
+    match /workers/{workerId} {
+      allow read: if admin() || (leader() && resource.data.teamLeaderEmployeeId == userData().employeeId);
+      allow create, update: if admin();
+      allow delete: if false;
+    }
+
+    match /employeeRemovalRequests/{requestId} {
+      allow create: if leaderOwns(request.resource.data.teamLeaderId)
+        && get(/databases/$(database)/documents/workers/$(request.resource.data.employeeId)).data.teamLeaderEmployeeId == userData().employeeId
+        && request.resource.data.status == 'pending'
+        && request.resource.data.keys().hasOnly(['employeeId', 'employeeName', 'teamLeaderId', 'teamLeaderName', 'status', 'requestedAt']);
+      allow read: if admin() || (leader() && resource.data.teamLeaderId == userData().employeeId);
+      allow update: if admin()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'reviewedAt'])
+        && request.resource.data.status in ['approved', 'rejected'];
+      allow delete: if false;
+    }
+
+    match /attendanceEditRequests/{requestId} {
+      allow create: if leaderOwns(request.resource.data.employeeId)
+        && request.resource.data.keys().hasOnly(['attendanceId', 'employeeId', 'employeeName', 'date', 'reason', 'status', 'requestedAt'])
+        && request.resource.data.attendanceId is string
+        && request.resource.data.date is string
+        && request.resource.data.reason is string
+        && request.resource.data.status == 'pending'
+        && exists(/databases/$(database)/documents/attendance/$(request.resource.data.attendanceId))
+        && get(/databases/$(database)/documents/attendance/$(request.resource.data.attendanceId)).data.employeeId == request.resource.data.employeeId
+        && get(/databases/$(database)/documents/attendance/$(request.resource.data.attendanceId)).data.date == request.resource.data.date
+        && (!get(/databases/$(database)/documents/attendance/$(request.resource.data.attendanceId)).data.keys().hasAny(['editAllowed'])
+          || get(/databases/$(database)/documents/attendance/$(request.resource.data.attendanceId)).data.editAllowed != true);
+      allow read: if admin() || (leader() && resource.data.employeeId == userData().employeeId);
+      allow update: if admin()
+        && resource.data.status == 'pending'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'decidedAt'])
+        && request.resource.data.status in ['approved', 'rejected'];
+      allow delete: if false;
+    }
+
+    match /attendance/{attendanceId} {
+      // Spark has no Cloud Functions. Team leaders may submit their own
+
+      // deterministic record, but all submitted payroll remains unverified
+      // until an admin recalculates it from the worker records and approves it.
+      allow create: if leaderOwns(request.resource.data.employeeId)
+        && attendanceId == request.resource.data.employeeId + '_' + request.resource.data.date
+        && validAttendanceSubmission(request.resource.data)
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.submittedAt == request.time
+        && request.resource.data.updatedAt == request.time;
+      // Direct getDoc checks run before the attendance document exists, so
+      // authorize that deterministic employeeId_date path as well.
+      allow read: if admin() || (leader() && (
+        (resource != null && resource.data.employeeId == userData().employeeId)
+        || attendanceId.matches('^' + userData().employeeId + '_[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+      ));
+      allow update: if (admin()
+        && (
+          (resource.data.reviewStatus == 'Pending'
+            && request.resource.data.employeeId == resource.data.employeeId
+            && request.resource.data.date == resource.data.date
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reviewStatus', 'reviewedAt', 'payrollStatus', 'payrollVerifiedAt', 'payrollVerifiedBy', 'totalPayment', 'overtimeCount', 'siteTotals', 'workers'])
+            && request.resource.data.reviewStatus in ['Approved', 'Rejected']
+            && ((request.resource.data.reviewStatus == 'Approved'
+              && request.resource.data.payrollStatus == 'Verified'
+              && request.resource.data.payrollVerifiedAt == request.time
+              && request.resource.data.payrollVerifiedBy == request.auth.uid)
+              || (request.resource.data.reviewStatus == 'Rejected'
+                && request.resource.data.payrollStatus == 'Unverified')))
+          ||
+          (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['editAllowed', 'editGrantedAt'])
+            && (!resource.data.keys().hasAny(['editAllowed']) || resource.data.editAllowed != true)
+            && request.resource.data.editAllowed == true)
+        ))
+        ||
+        (leaderOwns(resource.data.employeeId)
+            && resource.data.editAllowed == true
+            && request.resource.data.employeeId == resource.data.employeeId
+            && request.resource.data.date == resource.data.date
+            && validAttendanceSubmission(request.resource.data)
+            && request.resource.data.createdAt == resource.data.createdAt
+            && request.resource.data.submittedAt == request.time
+            && request.resource.data.updatedAt == request.time
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'reviewStatus', 'payrollStatus', 'payrollVerifiedAt', 'payrollVerifiedBy', 'editAllowed', 'overtimeCount', 'totalPayment', 'siteTotals', 'workers', 'note', 'rosterSummary', 'submittedAt', 'updatedAt']));
+      allow delete: if admin();
+    }
+  }
+}
+
