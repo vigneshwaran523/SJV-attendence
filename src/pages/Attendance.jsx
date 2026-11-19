@@ -29,14 +29,15 @@ import {
 } from "../services/attendance";
 const statusOptions = ["Present", "Half Day", "Absent"];
 const sites = [
-  "Sastri",
   "Balaji Nagar",
   "Kaveri",
   "Venkatesh Nagar",
-  "K.K site",
+  "K.K salai site",
   "Aani",
-  "Amathur",
-  "Other",
+  " K.K nagar",
+  "Jade",
+  "Tagore school",
+
 ];
 const money = (amount) =>
   new Intl.NumberFormat("en-IN", {
@@ -336,7 +337,7 @@ function changeWorker(id, changes) {
       className="text-orange-400"
     />
     <span>
-      ConstructPulse <b>Field Portal</b>
+      Sanjeevan Construction <b>Field Portal</b>
     </span>
   </div>
   <button
@@ -425,13 +426,6 @@ function changeWorker(id, changes) {
       <main className="mx-auto flex w-full max-w-3xl flex-col gap-4 px-3 py-5 sm:px-5">
         <div className="flex items-start gap-3 border-l-4 border-amber-500 bg-amber-50 p-4 text-amber-900 shadow-sm">
           <CircleAlert size={17} className="shrink-0" />
-          <div className="flex flex-col gap-1 text-xs">
-            <b>Site Rule: Mandatory Hard Hats &amp; Steel-Toe Boots</b>
-            <span>
-              Muster cut-off time for Gang #104 is 09:30 AM. OT auto-logs at
-              17:30.
-            </span>
-          </div>
         </div>
         <div className="flex items-center justify-between gap-2 text-sm font-semibold">
           <span>Shift Workforce Status</span>
@@ -486,7 +480,7 @@ function changeWorker(id, changes) {
         </div>
         <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">
           <div className="flex items-center justify-between gap-2"><b>Unverified payment estimate</b><strong>{money(paymentTotal)}</strong></div>
-          <p className="mt-1 text-xs">Submitted figures are not verified by the free Firebase plan. An administrator must check attendance and worker rates before approval.</p>
+          <p className="mt-1 text-xs">Submitted figures are verified by An administrator must check attendance and worker rates before approval.</p>
           <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs">
             {siteTotals.map((total) => <span key={total.site}>{total.site}: {money(total.amount)} ({total.workers})</span>)}
           </div>
@@ -613,7 +607,7 @@ function changeWorker(id, changes) {
                 <details className="group relative mt-2 flex justify-end">
                   <summary aria-label={`More actions for ${worker.name}`} className="list-none cursor-pointer rounded-md p-1 text-slate-500 hover:bg-slate-100"><MoreVertical size={18} /></summary>
                   <div className="absolute right-0 top-8 z-10 min-w-44 rounded-lg border bg-white p-1 shadow-lg">
-                    <button type="button" disabled={busy} onClick={() => sendWorkerRemovalRequest(worker)} className="w-full rounded-md px-3 py-2 text-left text-xs font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-50">Delete · request approval</button>
+                    <button type="button" disabled={busy} onClick={() => sendWorkerRemovalRequest(worker)} className="w-full rounded-md px-3 py-2 text-left text-xs font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-50">Delete </button>
                   </div>
                 </details>
                 <div className="mt-3 grid grid-cols-3 gap-1 rounded-xl border border-slate-200 bg-slate-100 p-1">
@@ -759,14 +753,6 @@ function changeWorker(id, changes) {
         </div>
       </main>
       <div className="bottom-actions fixed inset-x-0 bottom-16 z-20 mx-auto flex max-w-3xl gap-2 border-t border-slate-200 bg-white/95 p-3 backdrop-blur">
-        <button
-          className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-3 text-sm font-bold text-slate-800"
-          onClick={saveDraft}
-          disabled={!isEditable}
-          type="button"
-        >
-          <Save size={15} /> Save Draft
-        </button>
         <button
           className="flex flex-[1.3] items-center justify-center gap-2 rounded-xl bg-orange-500 px-3 py-3 text-sm font-bold text-white hover:bg-orange-600 disabled:opacity-60"
           disabled={busy || !isEditable || workers.length === 0}
